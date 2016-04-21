@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Network Lab 8</title>
+    <link rel=stylesheet type="text/css" href="/stylesheets/chat.css">
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 13px Helvetica, Arial; }
+      form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+      form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+      form button { width: 9%; background: #2095FE; color: white; border: none; padding: 10px; }
+
+    </style>
+
+  </head>
+  <body>
+    <header><h2>Socket.IO Chat</h2></header>
+    <div id="messages" class="messages-wrapper"></div>
+    <div>
+      <form action="">
+        <input id="m" autocomplete="off" /><button>Send</button>
+      </form>
+    </div>
+    <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+    <script>
+      var socket = io.connect('http://localhost:3000');
+      var typing = false;
+      var timeout = undefined;
+
+      $('form').submit(function(){
+        var str = $('#m').val();
+        if(str == "") return false;
+        if(str.indexOf('/to') > -1) {
+          var subStr = str.substring(4, str.length);
+          var receiver = subStr.substring(0, subStr.indexOf(" "));
+          var realMessage = subStr.substring(subStr.indexOf(" ")+1, subStr.length);
+          socket.emit('to someone', receiver, realMessage);
+        } else if(str == '/h') {
+          socket.emit('help');
+        } else if(str.indexOf('/name') > -1) {
+          var nickname = str.substring(6, str.length);
+          socket.emit('naming', nickname);
+        } else if(str == '/l') {
+          socket.emit('list');
+        } else {
+          socket.emit('message', $('#m').val());
+        }
+        $('#messages').append($('<div class="message to">').text($('#m').val()));
+        $("#messages").animate({ scrollTop: $('#messages').prop("scrollHeight")}, 1000);
+        $('#m').val('');
+        return false;
+      });
+      socket.on('system message', function(msg){
+        console.log(msg);
+      });
+      socket.on('message', function(msg){
+        $('#messages').append($('<div class="message from">').text(msg));
+        $("#messages").animate({ scrollTop: $('#messages').prop("scrollHeight")}, 1000);
+      });
+      socket.on('my message', function(msg){
+        $('#messages').append($('<div class="message from">').text(msg));
+        $("#messages").animate({ scrollTop: $('#messages').prop("scrollHeight")}, 1000);
+      });
+      socket.on('typing', function(user) {
+        console.log(user + ' is typing');
+      });
+      socket.on('stop typing', function(user) {
+        console.log(user + ' stopped typing');
+      });
+
+      //typing indicator
+      $('#m').keydown(function(e) {
+        if (e.keyCode == 13 && $('#m').val() == "") return;
+
+        if(typing == false) {
+          typing = true
+          socket.emit('typing');
+          timeout = setTimeout(timeoutFunction, 5000);
+        } else {
+          clearTimeout(timeout);
+          timeout = setTimeout(timeoutFunction, 5000);
+        }
+      });
+      function timeoutFunction(){
+        typing = false;
+        socket.emit('stop typing');
+      }
+    </script>
+  </body>
+</html>

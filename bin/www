@@ -1,0 +1,164 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require('../app');
+var debug = require('debug')('networkMidsocket.io.chat.example:server');
+var http = require('http');
+var _ = require('lodash');
+var socketIO = require('socket.io');
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+
+/**
+ *  Init socket io and set event handler
+ */
+
+var io = socketIO(server); //run socket io server
+
+io.on('connection', function(socket) {
+  socket.broadcast.emit('message', socket.id + ' joined the room');
+  debug('client ' + socket.id + ' connected');
+  socket.emit('system message', 'Connected with id:'+socket.id);
+  socket.emit('message', 'Welcome! Type /h for help');
+
+  socket.on('help', function() { // help
+    socket.emit('message', '/name $$$: Change nickname; /to $$$ YOUR_MESSAGE: send private message to $$$');
+    socket.emit('message', '/l:list all online users; /h:help');
+    socket.emit('message', 'Open your console to get typing indicator');
+  });
+
+  socket.on('naming', function(name) { // set user nickname
+    if(name != "") {
+      socket.username = name;
+      socket.emit('message', 'Your nickname changed to ' + name);
+      socket.broadcast.emit('message', socket.id + ' has change its name to ' + name);
+    }
+  });
+
+  socket.on('message', function(msg) { //normal message
+    var name = (socket.username == null) ? socket.id : socket.username;
+    socket.broadcast.emit('message', name + ' say: ' + msg);
+  });
+
+  socket.on('to someone', function(id, msg) { //private message
+    debug("private message to "+id);
+    var receiver = "";
+    for(var sock in io.sockets.sockets) {
+      if(io.sockets.connected[sock].username == id) {
+        receiver = sock;
+        break;
+      }
+    }
+    receiver = (receiver == "") ? id : receiver;
+    var name = (socket.username == null) ? socket.id : socket.username;
+    socket.broadcast.to(receiver).emit('my message', name + " whisper: " + msg);
+  });
+
+  socket.on('disconnect', function() {
+    var name = (socket.username == null) ? socket.id : socket.username;
+    socket.broadcast.emit('message', name + " left the room");
+  });
+
+  socket.on('typing', function() {
+    var name = (socket.username == null) ? socket.id : socket.username;
+    socket.broadcast.emit('typing', name);
+  });
+
+  socket.on('stop typing', function() {
+    var name = (socket.username == null) ? socket.id : socket.username;
+    socket.broadcast.emit('stop typing', name);
+  })
+
+  socket.on('list', function() {
+    var users = _.map(io.sockets.sockets, function(s) {
+      if(s.username != null)
+        return s.username;
+      else
+        return s.id;
+    });
+    socket.emit('message', 'online users: ' + users);
+  })
+});
+
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  debug('Listening on ' + bind);
+}
