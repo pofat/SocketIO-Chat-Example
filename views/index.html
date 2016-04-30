@@ -21,8 +21,8 @@
         <input id="m" autocomplete="off" /><button>Send</button>
       </form>
     </div>
-    <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
-    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+    <script src="/javascripts/socket.io-1.4.5.js"></script>
+    <script src="/javascripts/jquery-1.12.3.min.js"></script>
     <script>
       var socket = io.connect();
       var typing = false;
@@ -67,6 +67,10 @@
       });
       socket.on('stop typing', function(user) {
         console.log(user + ' stopped typing');
+      });
+
+      socket.on('disconnect', function() {
+        console.log('disconnet');
       });
 
       //typing indicator
